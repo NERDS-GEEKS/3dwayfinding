@@ -1,0 +1,241 @@
+/**
+ * Wayfinding chat — launcher and conversation sheet.
+ *
+ * Sits in the same floating layer as the dock, and borrows its material
+ * (white, blurred, heavily rounded) so it reads as part of the same control
+ * set. Everything is inside .wf-stage, which is positioned, so absolute
+ * placement is relative to the space rather than the page.
+ *
+ * Accent colour is NavMe logo navy (#182858), not the old red chrome.
+ */
+
+/* Launcher: right side above the dock. */
+.wf-chat-fab {
+  position: absolute;
+  right: 10px;
+  bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: #182858;
+  box-shadow: 0 2px 12px rgba(24, 40, 88, 0.38);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wf-chat-fab svg { width: 15px; height: 15px; }
+.wf-chat-fab:hover { background: #101840; }
+/* Hidden until the page has POIs to answer with — offering to help before
+   anything is loaded only invites a question that cannot be answered. */
+.wf-chat:not(.is-ready) .wf-chat-fab { display: none; }
+
+/* Open: the panel is the affordance, so the launcher steps back. */
+.wf-chat.is-open .wf-chat-fab { opacity: 0; pointer-events: none; }
+
+@media (max-width: 380px) {
+  .wf-chat-fab span { display: none; }
+  .wf-chat-fab { padding: 6px; }
+}
+
+/* ── the sheet ── */
+.wf-chat-panel {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Clears the dock, and lifts further when the keyboard is up — --wf-kb is
+     published by the page from visualViewport. */
+  bottom: calc(74px + var(--wf-kb, 0px) + env(safe-area-inset-bottom, 0px));
+  z-index: 12;
+  width: min(420px, calc(100% - 20px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /* Shrink rather than overflow when the keyboard leaves little room. */
+  max-height: min(62vh, 560px, calc(100vh - var(--wf-kb, 0px) - 150px));
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--border-base, rgba(15, 23, 42, 0.14));
+  box-shadow: 0 16px 44px rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  transition: bottom 140ms ease-out;
+}
+.wf-chat-panel[hidden] { display: none; }
+
+.wf-chat-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 12px 10px 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+.wf-chat-head-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wf-chat-title { font-size: 14px; font-weight: 800; color: #0f172a; }
+.wf-chat-sub { font-size: 11.5px; color: #64748b; }
+
+.wf-chat-close {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  cursor: pointer;
+}
+.wf-chat-close svg { width: 16px; height: 16px; }
+.wf-chat-close:hover { background: rgba(15, 23, 42, 0.12); }
+
+.wf-chat-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wf-chat-msg { display: flex; }
+.wf-chat-msg.is-user { justify-content: flex-end; }
+
+.wf-chat-bubble {
+  margin: 0;
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.wf-chat-msg.is-bot .wf-chat-bubble {
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  border-bottom-left-radius: 5px;
+}
+.wf-chat-msg.is-user .wf-chat-bubble {
+  background: #182858;
+  color: #fff;
+  border-bottom-right-radius: 5px;
+}
+/* Exits and medical help: the answer itself is the urgent part. */
+.wf-chat-msg.is-urgent .wf-chat-bubble {
+  background: rgba(24, 40, 88, 0.1);
+  color: #101840;
+  font-weight: 600;
+}
+
+.wf-chat-results { display: flex; flex-direction: column; gap: 6px; }
+
+.wf-chat-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease-out, transform 120ms ease-out;
+}
+.wf-chat-result:hover { border-color: #182858; transform: translateX(2px); }
+
+.wf-chat-result-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.wf-chat-result-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wf-chat-result-meta {
+  font-size: 11px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wf-chat-result-dist { flex: 0 0 auto; font-size: 11.5px; font-weight: 700; color: #2563eb; }
+.wf-chat-result-go { flex: 0 0 auto; display: grid; place-items: center; color: #94a3b8; }
+.wf-chat-result-go svg { width: 16px; height: 16px; }
+.wf-chat-result:hover .wf-chat-result-go { color: #182858; }
+
+/* Openers, so the first message costs no typing. Horizontally scrollable
+   rather than wrapped: a growing chip row must not eat the log's height. */
+.wf-chat-quick {
+  display: flex;
+  gap: 6px;
+  padding: 0 14px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.wf-chat-quick::-webkit-scrollbar { display: none; }
+.wf-chat-chip {
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wf-chat-chip:hover { border-color: #182858; color: #182858; }
+
+.wf-chat-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+.wf-chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 999px;
+  background: #fff;
+  color: #0f172a;
+  /* 16px: anything smaller makes iOS Safari zoom the page on focus, which
+     shifts the Matterport view behind the sheet. */
+  font-size: 16px;
+  line-height: 1.2;
+}
+.wf-chat-input:focus { outline: none; border-color: #182858; box-shadow: 0 0 0 3px rgba(24, 40, 88, 0.16); }
+.wf-chat-input::placeholder { color: #94a3b8; }
+
+.wf-chat-send {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #182858;
+  color: #fff;
+  cursor: pointer;
+}
+.wf-chat-send svg { width: 17px; height: 17px; }
+.wf-chat-send:hover { background: #101840; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-chat-panel, .wf-chat-result { transition: none; }
+  .wf-chat-result:hover { transform: none; }
+}

@@ -1,0 +1,853 @@
+/* /wayfinding — walkthrough-only route planner. Mobile first. */
+
+.wf-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-deep, #f8fafc);
+  color: var(--text-1, #0f172a);
+}
+
+/* ── top bar: just a back button and the distance ── */
+.wf-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-dim);
+  background: var(--bg-surface, #ffffff);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.wf-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-base, rgba(15, 23, 42, 0.14));
+  text-decoration: none;
+  color: var(--text-1, #0f172a);
+}
+.wf-back:hover { background: var(--bg-hover, #f1f5f9); }
+
+.wf-back-chevron { font-size: 20px; line-height: 1; margin-top: -2px; }
+.wf-bar-logo { width: 24px; height: 24px; border-radius: 6px; object-fit: contain; }
+
+.wf-bar-distance {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(24, 40, 88, 0.12), rgba(37, 99, 235, 0.08));
+  border: 1px solid rgba(24, 40, 88, 0.22);
+}
+.wf-bar-distance.hidden { display: none; }
+
+.wf-distance-value {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  color: #182858;
+  font-variant-numeric: tabular-nums;
+}
+
+.wf-distance-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3, #64748b);
+}
+
+/* ── stage ── */
+.wf-main { flex: 1 1 auto; min-height: 0; display: flex; }
+.wf-main.hidden { display: none; }
+
+.wf-stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #0b1a2e; }
+.wf-space { position: absolute; inset: 0; }
+.wf-space.hidden { display: none; }
+
+.wf-space-empty {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  color: rgba(248, 250, 252, 0.86);
+  padding: 20px;
+}
+.wf-space-empty.is-visible { display: flex; }
+
+.wf-status {
+  position: absolute;
+  /* Right-aligned: the NavMe back control owns the top-left corner. */
+  right: 12px;
+  left: auto;
+  top: 10px;
+  text-align: right;
+  z-index: 6;
+  margin: 0;
+  max-width: min(60%, 420px);
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.35;
+  background: rgba(15, 23, 42, 0.72);
+  color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(6px);
+}
+.wf-status.is-ok { background: rgba(22, 163, 74, 0.88); }
+.wf-status.is-warn { background: rgba(217, 119, 6, 0.9); }
+.wf-status.is-error { background: rgba(24, 40, 88, 0.92); }
+
+/* ── bottom dock: two tappable fields that open the search panel ── */
+.wf-dock {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index: 8;
+  width: min(720px, calc(100% - 20px));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border-base, rgba(15, 23, 42, 0.14));
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(8px);
+}
+
+.wf-picker {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 11px;
+  border-radius: 11px;
+  border: 1px solid var(--border-base, rgba(15, 23, 42, 0.14));
+  background: var(--bg-elevated, #f8fafc);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.wf-picker:hover { border-color: var(--border-bright, rgba(15, 23, 42, 0.24)); }
+
+/* Start / destination field + its own clear (X). */
+.wf-picker-slot {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+.wf-picker-slot .wf-picker {
+  flex: 1 1 auto;
+  width: 100%;
+  padding-right: 28px;
+}
+.wf-picker-x {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  color: #475569;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.wf-picker-x:hover {
+  background: rgba(24, 40, 88, 0.14);
+  color: #182858;
+}
+.wf-picker-x[hidden] { display: none; }
+
+.wf-picker-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3, #64748b);
+}
+
+.wf-picker-value {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wf-picker-value.is-empty { font-weight: 500; color: var(--text-3, #64748b); }
+
+.wf-swap {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--border-base, rgba(15, 23, 42, 0.14));
+  background: transparent;
+  color: var(--text-2, #475569);
+  font-size: 14px;
+  cursor: pointer;
+}
+.wf-swap:hover { background: var(--bg-hover, #f1f5f9); }
+
+.wf-icon-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.wf-icon-btn svg { width: 18px; height: 18px; }
+
+.wf-icon-btn--clear {
+  background: transparent;
+  color: var(--text-2, #475569);
+  border: 1px solid var(--border-base, rgba(15, 23, 42, 0.14));
+}
+.wf-icon-btn--clear:hover { background: var(--bg-hover, #f1f5f9); }
+
+/* ── destination search panel (mirrors the AR experience) ── */
+.wf-search-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+.wf-search-overlay[hidden] { display: none; }
+
+.wf-search-panel {
+  width: min(560px, 100%);
+  max-height: min(78%, 560px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px 18px 0 0;
+  background: var(--bg-surface, #ffffff);
+  box-shadow: 0 -14px 40px rgba(15, 23, 42, 0.32);
+  overflow: hidden;
+}
+
+.wf-search-header {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.wf-search-header-top { display: flex; align-items: center; gap: 10px; }
+
+.wf-search-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font-display, system-ui, sans-serif);
+}
+
+.wf-search-close {
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-2, #475569);
+  cursor: pointer;
+}
+.wf-search-close svg { width: 18px; height: 18px; }
+.wf-search-close:hover { background: var(--bg-hover, #f1f5f9); }
+
+.wf-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 42px;
+  padding: 0 13px;
+  border-radius: 11px;
+  border: 1px solid var(--border-base, rgba(15, 23, 42, 0.14));
+  background: var(--bg-elevated, #f8fafc);
+  color: var(--text-1, #0f172a);
+  font-size: 15px; /* >=16px avoids iOS zoom-on-focus; 15 is a deliberate balance */
+}
+.wf-search-input:focus { outline: 2px solid rgba(24, 40, 88, 0.4); outline-offset: 1px; }
+
+.wf-search-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.wf-search-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-1, #0f172a);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.wf-search-item:hover { background: var(--bg-hover, #f1f5f9); }
+
+.wf-search-item-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-search-empty {
+  padding: 22px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3, #64748b);
+}
+
+/* ── diagnostics strip ── */
+.wf-meta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-dim);
+  background: var(--bg-elevated, #f8fafc);
+  font-size: 10px;
+  color: var(--text-3, #64748b);
+  flex-wrap: wrap;
+}
+
+.wf-meta-field { display: flex; align-items: center; gap: 6px; }
+.wf-meta-field > span { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+.wf-meta-field select { font-size: 11px; padding: 3px 6px; }
+
+.wf-navmesh-state.is-ok { color: var(--green, #16a34a); font-weight: 600; }
+.wf-navmesh-state.is-warn { color: var(--amber, #d97706); }
+.wf-navmesh-state.is-error { color: var(--red, #dc2626); }
+
+.wf-hint { margin: 0; font-size: 10px; line-height: 1.45; color: var(--text-3, #64748b); }
+.wf-hint code { padding: 1px 4px; border-radius: 4px; background: var(--bg-hover, #f1f5f9); }
+
+/* ── mobile ── */
+@media (max-width: 720px) {
+  .wf-bar { padding: 7px 10px; }
+  .wf-status { max-width: calc(100% - 24px); font-size: 10px; }
+  .wf-meta { font-size: 9px; }
+  .wf-meta-field > span { display: none; }
+  .wf-dock { gap: 7px; padding: 10px; }
+  .wf-icon-btn { width: 46px; height: 46px; }
+}
+
+/* ── category pills + distance, mirroring the AR destination search ── */
+.wf-search-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.wf-search-pills::-webkit-scrollbar { display: none; }
+
+.wf-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-base, rgba(15, 23, 42, 0.14));
+  background: var(--bg-elevated, #f8fafc);
+  color: var(--text-2, #475569);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wf-pill:hover { background: var(--bg-hover, #f1f5f9); }
+
+.wf-pill.is-active {
+  background: #182858;
+  border-color: #182858;
+  color: #fff;
+}
+
+.wf-pill-icon { display: inline-flex; width: 14px; height: 14px; }
+.wf-pill-icon svg { width: 100%; height: 100%; }
+
+.wf-search-item-dist {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* Floor name on a result row, between the label and the distance. */
+.wf-search-item-floor {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-hover, #f1f5f9);
+  color: var(--text-secondary, #64748b);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wf-search-item-floor + .wf-search-item-dist { margin-left: 8px; }
+
+/* Stairs editor — super admin only. */
+.wf-stairs {
+  position: absolute;
+  top: 64px;
+  right: 16px;
+  z-index: 30;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg-elevated, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+  font-size: 13px;
+}
+.wf-stairs.hidden { display: none; }
+.wf-stairs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.wf-stairs-close {
+  border: 0; background: transparent; font-size: 20px; line-height: 1;
+  cursor: pointer; color: var(--text-secondary, #64748b);
+}
+.wf-stairs-hint { margin: 0 0 10px; color: var(--text-secondary, #64748b); line-height: 1.45; }
+.wf-stairs-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.wf-stairs-row > * { min-width: 0; flex: 1 1 auto; }
+.wf-stairs-row > span { flex: 0 0 auto; color: var(--text-secondary, #64748b); }
+.wf-stairs-name {
+  width: 100%; padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border, #e2e8f0); background: var(--bg-surface, #fff);
+  color: var(--text-primary, #0f172a); font-size: 13px;
+}
+.wf-stairs-points {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  min-height: 34px; padding: 8px; margin-bottom: 10px;
+  border-radius: 8px; background: var(--bg-hover, #f1f5f9);
+}
+.wf-stairs-chip {
+  padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  background: rgba(24, 40, 88, 0.12); color: #182858; white-space: nowrap;
+}
+.wf-stairs-empty { color: var(--text-secondary, #64748b); font-size: 12px; }
+.wf-stairs-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.wf-stairs-actions button { flex: 1 1 auto; }
+.wf-stairs-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.wf-stairs-list li {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 0; border-top: 1px solid var(--border, #e2e8f0);
+}
+.wf-stairs-list-name { font-weight: 700; }
+.wf-stairs-list-pts {
+  flex: 1 1 100%; font-size: 11px; color: var(--text-secondary, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+.wf-stairs-edit, .wf-stairs-del {
+  border: 1px solid var(--border, #e2e8f0); background: var(--bg-surface, #fff);
+  border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer;
+  color: var(--text-primary, #0f172a);
+}
+.wf-stairs-del { color: #182858; }
+
+
+/* ── Standalone wayfinding: light-only, cropped Matterport, compact chrome ── */
+
+/**
+ * Light only, whatever the device says.
+ *
+ * A dark shell around a lit photographic space reads as a rendering fault, and
+ * the navy trail is tuned against light chrome. The media query is overridden
+ * too, or a dark-mode device repaints the frame before the attribute lands.
+ */
+:root[data-theme='light'] .wf-page,
+.wf-page {
+  color-scheme: light;
+  background: #f8fafc;
+  color: #0f172a;
+}
+@media (prefers-color-scheme: dark) {
+  .wf-page,
+  .wf-page * {
+    color-scheme: light;
+  }
+}
+
+/**
+ * Crop Matterport's own chrome.
+ *
+ * The Showcase logo sits top-left and its control strip bottom-centre; neither
+ * can be removed by URL parameter. Over-sizing the iframe and clipping the
+ * container cuts both bands off instead of covering them, so nothing of theirs
+ * is clickable or visible.
+ */
+/* Keep the original `position: absolute; inset: 0` — switching to relative
+ * drops the inset stretch and collapses the container to zero height. Only
+ * the clipping is added here. */
+.wf-space {
+  overflow: hidden;
+}
+.wf-space iframe {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  /* 56px off the top, 64px off the bottom. */
+  top: -56px;
+  height: calc(100% + 120px);
+  border: 0;
+}
+
+/* Compact chrome: smaller bar, tighter dock, less padding everywhere. */
+.wf-bar { padding: 6px 10px; min-height: 44px; }
+.wf-bar-logo { height: 22px; }
+.wf-bar-distance { padding: 4px 10px; }
+.wf-distance-value { font-size: 15px; }
+
+.wf-dock { padding: 6px; gap: 6px; }
+.wf-pick { padding: 6px 10px; }
+.wf-pick-label { font-size: 9px; letter-spacing: 0.06em; }
+.wf-pick-value { font-size: 13px; }
+.wf-search-panel { max-height: min(62vh, 520px); }
+.wf-search-item { padding: 8px 10px; }
+.wf-search-item-label { font-size: 13px; }
+.wf-status { padding: 4px 10px; font-size: 12px; }
+
+/* ── Dock + search panel: fixed height, smaller labels, keyboard-aware ── */
+
+/* Labels were shouting; the value is the thing that matters. */
+.wf-picker-label { font-size: 8px; letter-spacing: 0.05em; opacity: 0.6; }
+.wf-picker-value { font-size: 12px; }
+.wf-picker { padding: 5px 9px; }
+
+/* Clear button down to a tap target, not a slab. */
+.wf-icon-btn--clear { width: 30px; height: 30px; padding: 0; }
+.wf-icon-btn--clear svg { width: 15px; height: 15px; }
+
+/**
+ * Fixed-height results panel.
+ *
+ * Sizing to content made the sheet jump on every keystroke as matches came and
+ * went, which moves the row under the user's finger mid-tap. A constant height
+ * with the list scrolling inside keeps it still.
+ */
+.wf-search-panel {
+  height: min(62vh, 520px);
+  max-height: min(62vh, 520px);
+}
+.wf-search-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/**
+ * Keyboard-aware: --wf-kb is the on-screen keyboard height, published by the
+ * page from visualViewport. Lifting the sheet by that much keeps the input and
+ * the first results visible instead of sitting behind the keyboard.
+ */
+.wf-search-overlay {
+  padding-bottom: var(--wf-kb, 0px);
+  transition: padding-bottom 140ms ease-out;
+}
+.wf-search-panel {
+  /* Shrink rather than overflow when the keyboard leaves little room. */
+  max-height: min(62vh, 520px, calc(100vh - var(--wf-kb, 0px) - 90px));
+}
+
+/* ── Arrival popup ── */
+.wf-arrived {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Announce, do not trap: the space stays visible and draggable behind. */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+.wf-arrived.is-in { opacity: 1; }
+.wf-arrived.hidden { display: none; }
+
+.wf-arrived-card {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  max-width: min(86vw, 340px);
+  padding: 20px 22px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.28);
+  text-align: center;
+  transform: translateY(8px) scale(0.98);
+  transition: transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.wf-arrived.is-in .wf-arrived-card { transform: translateY(0) scale(1); }
+
+.wf-arrived-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #16a34a;
+}
+.wf-arrived-tick svg { width: 22px; height: 22px; }
+.wf-arrived-title { font-size: 16px; font-weight: 700; color: #0f172a; }
+.wf-arrived-name { font-size: 13px; color: #475569; }
+.wf-arrived-ask {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+.wf-arrived-ask.hidden { display: none; }
+
+.wf-arrived-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+.wf-arrived-feedback.hidden { display: none; }
+
+.wf-thumb {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out, transform 120ms ease-out;
+}
+.wf-thumb svg { width: 22px; height: 22px; }
+.wf-thumb:hover:not(:disabled) {
+  border-color: #182858;
+  color: #182858;
+  transform: translateY(-1px);
+}
+.wf-thumb--up.is-selected {
+  background: #ecfdf5;
+  border-color: #16a34a;
+  color: #15803d;
+}
+.wf-thumb--down.is-selected {
+  background: #fff1f2;
+  border-color: #e11d48;
+  color: #be123c;
+}
+.wf-thumb.is-dimmed { opacity: 0.35; }
+.wf-thumb:disabled { cursor: default; }
+
+.wf-arrived-thanks {
+  margin: 2px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #182858;
+}
+.wf-arrived-thanks.hidden { display: none; }
+
+.wf-arrived-done { margin-top: 6px; min-width: 110px; }
+
+/* ── Floating back button; dock revealed only once loaded ──────────────── */
+
+/**
+ * The top bar was a solid strip eating vertical space above a photographic
+ * view. Float the control over the space instead so the space runs full
+ * height, and give the button its own chrome since it no longer sits on a bar.
+ */
+.wf-bar {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: 10px;
+  right: 10px;
+  z-index: 9;
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+.wf-bar > * { pointer-events: auto; }
+
+.wf-back {
+  padding: 5px 9px 5px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.wf-bar-distance {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  padding: 4px 12px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+/* The space now owns the full height the bar used to take. */
+.wf-main { padding-top: 0; }
+
+/* Dock: absent until the space reports fully loaded, then eased in. */
+.wf-dock {
+  transition: opacity 220ms ease-out, transform 220ms ease-out;
+}
+.wf-dock.is-loading {
+  opacity: 0;
+  transform: translateX(-50%) translateY(14px);
+  pointer-events: none;
+}
+
+/* ── Localization gate ─────────────────────────────────────────────────── */
+.wf-localize {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: #0f172a;
+  transition: opacity 300ms ease-out;
+}
+.wf-localize.is-done { opacity: 0; pointer-events: none; }
+
+.wf-localize-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.wf-localize-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.78));
+}
+.wf-localize-body {
+  position: relative;
+  padding: 24px;
+  text-align: center;
+  color: #fff;
+  max-width: 340px;
+}
+/* A frame to aim with — scanning a blank wall is the usual reason VPS fails. */
+.wf-localize-reticle {
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 18px;
+  border-radius: 18px;
+  border: 2px solid rgba(255,255,255,0.55);
+  box-shadow: 0 0 0 9999px rgba(15,23,42,0.12) inset;
+  animation: wf-reticle 1.8s ease-in-out infinite;
+}
+@keyframes wf-reticle {
+  0%,100% { transform: scale(1);    opacity: 0.75; }
+  50%     { transform: scale(1.05); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .wf-localize-reticle { animation: none; } }
+
+.wf-localize-title { margin: 0 0 6px; font-size: 20px; font-weight: 700; }
+.wf-localize-copy  { margin: 0 0 18px; font-size: 14px; line-height: 1.5; opacity: 0.9; }
+.wf-localize-start {
+  padding: 11px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #182858;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* "Your location" as a start reads as a state, not an unfilled field. */
+.wf-picker-value.is-you { color: #182858; font-weight: 700; }
+
+
+/* The gate hides rather than unmounting after skip/success. */
+.wf-localize.is-done {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+
+/* Skipping is a way out, not the main action — quiet it down. */
+.wf-localize-skip {
+  display: block;
+  margin: 14px auto 0;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.wf-localize-skip:hover { color: #fff; }

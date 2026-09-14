@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+# .env IS committed here on purpose: every var is VITE_-prefixed and
+# therefore already shipped inside the public client bundle. Never add a
+# non-VITE_ secret (service_role, API secrets) to this file.
+.env.local
+.env.*.local
+
+# local dev TLS cert — never commit
+.certs/
