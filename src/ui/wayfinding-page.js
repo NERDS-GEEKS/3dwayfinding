@@ -598,13 +598,12 @@ export function initWayfindingPage(container, opts = {}) {
     syncPickers();
 
     if (role === 'from') {
-      // Walk to the start straight away, so the space matches the choice.
-      // No lookAt: the heading is the user's to control, so we move them
-      // without ever turning the view for them.
+      // Walk to the start, then turn to face its marker so the camera isn’t
+      // left on Matterport’s leftover sweep heading.
       const a = poiPosition(poisData[fromIdx]);
       if (a && isMatterportMapActive()) {
         setStatus('Moving to the start…');
-        await matterportGoToNearestSweep(a);
+        await matterportGoToNearestSweep(a, a);
       }
     }
 
@@ -1872,19 +1871,45 @@ export function initWayfindingPage(container, opts = {}) {
   });
 
   /**
-   * Chat picks a destination the same way the search panel does: set `to`,
-   * then route if a start (or localized pose) is already known.
+   * Chat picks a destination and routes from wherever you are standing.
+   * An explicit Start POI still wins if the user chose one; otherwise the
+   * current scan point becomes the start — no “pick a start” prompt.
    */
+  async function ensureStartFromHere() {
+    if (fromIdx >= 0) return true;
+    try {
+      const here = await matterportCurrentSweep();
+      if (here?.ok && here.sweep) {
+        localizedPos = {
+          x: Number(here.sweep.x),
+          y: Number(here.sweep.y),
+          z: Number(here.sweep.z),
+        };
+        syncPickers();
+        return [localizedPos.x, localizedPos.y, localizedPos.z].every(Number.isFinite);
+      }
+    } catch {
+      /* fall through to camera pose */
+    }
+    const pose = getMatterportCameraPose()?.position;
+    if (pose && [pose.x, pose.y, pose.z].every(Number.isFinite)) {
+      localizedPos = { x: pose.x, y: pose.y, z: pose.z };
+      syncPickers();
+      return true;
+    }
+    return Boolean(localizedPos);
+  }
+
   async function navigateFromChat(idx) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= poisData.length) return;
     toIdx = idx;
     syncPickers();
-    if (localizedPos || fromIdx >= 0) {
-      await runNavigate();
+    const ready = await ensureStartFromHere();
+    if (!ready) {
+      setStatus('Could not read where you are standing yet. Move in the space, then ask again.', 'warn');
       return;
     }
-    setStatus('Choose a start, then I’ll route you there.');
-    openSearch('from');
+    await runNavigate();
   }
 
   const stageEl = page.querySelector('.wf-stage');

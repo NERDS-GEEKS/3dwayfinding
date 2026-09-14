@@ -6031,11 +6031,13 @@ export async function matterportGoToNearestSweep(position, lookAt = null) {
     try {
       await refreshMatterportCameraPose(120);
       const cam = lastCameraPose?.position ?? near.sweep;
-      const yaw = rotationYawToward(cam, lookAt);
-      if (typeof mpSdk.Camera?.setRotation === 'function') {
+      // Standing on the target: yaw would be noise, leave the heading alone.
+      const flat = Math.hypot(lookAt.x - cam.x, lookAt.z - cam.z);
+      if (flat >= 0.35 && typeof mpSdk.Camera?.setRotation === 'function') {
+        const yaw = rotationYawToward(cam, lookAt);
         await mpSdk.Camera.setRotation(yaw, { speed: 120 });
+        await refreshMatterportCameraPose(220);
       }
-      await refreshMatterportCameraPose(220);
     } catch {
       /* standing in the right place already helps; heading is a bonus */
     }
